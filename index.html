@@ -251,6 +251,53 @@
     .hero h1{font-size:23px;}
     .beca-box{flex-direction:column; align-items:flex-start;}
   }
+
+  /* ---- Distribución ---- */
+  .ingreso-box{
+    background:var(--white); border:1px solid var(--gold); border-radius:14px;
+    padding:14px 16px; margin-bottom:18px; box-shadow:var(--shadow);
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .ingreso-box .label{font-weight:600; font-size:14px;}
+  .ingreso-box .hint{font-size:11.5px; color:var(--plum-soft); margin-top:2px;}
+  .ingreso-input-wrap{display:flex; align-items:center; gap:6px;}
+  .ingreso-input-wrap input{
+    width:110px; padding:8px 8px; border-radius:8px; border:1.5px solid var(--gold);
+    font-family:'Poppins',sans-serif; font-size:16px; font-weight:600; text-align:center; background:#FFF9EA;
+  }
+  .ingreso-input-wrap select{
+    width:auto; padding:8px 10px; border-radius:8px; border:1.5px solid var(--gold);
+    font-family:'Poppins',sans-serif; font-size:13px; font-weight:600; background:#FFF9EA;
+  }
+
+  .pct-total-bar{
+    height:12px; border-radius:7px; background:var(--cream-2); overflow:hidden; border:1px solid var(--line);
+    margin-bottom:6px;
+  }
+  .pct-total-fill{height:100%; border-radius:7px; transition:width .3s, background .3s;}
+  .pct-total-label{
+    display:flex; justify-content:space-between; font-size:12.5px; font-weight:600; margin-bottom:18px;
+  }
+  .pct-total-label.ok{color:var(--sage-dark);}
+  .pct-total-label.warn{color:var(--danger);}
+
+  .dist-row{
+    background:var(--white); border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; margin-bottom:10px; box-shadow:var(--shadow);
+    display:grid; grid-template-columns:1fr 90px 40px 110px 32px; gap:8px; align-items:center;
+  }
+  .dist-row input[type=text]{font-weight:600;}
+  .dist-row .pct-input-wrap{display:flex; align-items:center; gap:2px;}
+  .dist-row .pct-input-wrap input{width:100%; text-align:right;}
+  .dist-row .pct-sign{font-size:12px; color:var(--plum-soft); font-weight:600;}
+  .dist-row .dist-amount{font-family:'Fraunces',serif; font-weight:600; color:var(--sage-dark); text-align:right; font-size:14.5px; white-space:nowrap;}
+  .dist-row .dist-bar-wrap{grid-column:1/-1; height:5px; background:var(--cream-2); border-radius:4px; overflow:hidden;}
+  .dist-row .dist-bar-fill{height:100%; background:linear-gradient(90deg,var(--sage),var(--blush)); border-radius:4px;}
+
+  @media (max-width:560px){
+    .dist-row{grid-template-columns:1fr 70px 20px 90px 28px; gap:6px;}
+    .dist-row input[type=text]{font-size:12.5px;}
+  }
 </style>
 </head>
 <body>
@@ -265,6 +312,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('colegiatura')">🎓 Colegiatura</button>
     <button class="tab-btn" onclick="switchTab('presupuesto')">🌿 Presupuesto personal</button>
+    <button class="tab-btn" onclick="switchTab('distribucion')">🌸 Distribución</button>
   </div>
 
   <!-- ============ COLEGIATURA ============ -->
@@ -402,6 +450,34 @@
     </div>
   </section>
 
+  <!-- ============ DISTRIBUCIÓN ============ -->
+  <section id="tab-distribucion" class="panel">
+
+    <div class="ingreso-box">
+      <div>
+        <div class="label">Ingreso a repartir</div>
+        <div class="hint">Cambia el monto y el periodo — los montos de cada categoría se recalculan solos.</div>
+      </div>
+      <div class="ingreso-input-wrap">
+        <span style="font-weight:700;color:var(--gold);font-size:16px;">$</span>
+        <input type="number" id="ingresoInput" min="0" step="1" onchange="updateIngreso(this.value)">
+        <select id="periodoInput" onchange="updatePeriodo(this.value)">
+          <option value="Semanal">/ semana</option>
+          <option value="Quincenal">/ quincena</option>
+          <option value="Mensual">/ mes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="pct-total-bar"><div class="pct-total-fill" id="pctTotalFill"></div></div>
+    <div class="pct-total-label" id="pctTotalLabel"></div>
+
+    <div id="distRows"></div>
+
+    <button class="add-btn" onclick="addDistCategoria()">＋ Agregar categoría</button>
+    <div class="note">💡 Ponle 0% a lo que ahorita no puedas (como Inversión mientras pagas tarjetas) y súbeselo a Pago de deudas — cuando termines, muévele el porcentaje de regreso. El total debería sumar 100% para repartir todo tu ingreso.</div>
+  </section>
+
 </div>
 
 <div class="save-toast" id="saveToast">Guardado ✓</div>
@@ -443,6 +519,18 @@ let presupuesto = {
   ]
 };
 
+let distribucion = {
+  ingreso: 1000,
+  periodo: 'Semanal',
+  categorias: [
+    {id:'d1', nombre:'💳 Pago de deudas', pct:40},
+    {id:'d2', nombre:'🏠 Gastos fijos', pct:25},
+    {id:'d3', nombre:'🌷 Gastos personales', pct:20},
+    {id:'d4', nombre:'🏦 Inversión / Ahorro', pct:0},
+    {id:'d5', nombre:'🎉 Diversión', pct:15},
+  ]
+};
+
 let idCounter = 100;
 function newId(){ return 'id' + (idCounter++) + '_' + Date.now(); }
 
@@ -453,6 +541,7 @@ function scheduleSave(){
   saveTimer = setTimeout(async ()=>{
     try{ await window.storage.set('colegiatura', JSON.stringify(colegiatura), false); }catch(e){}
     try{ await window.storage.set('presupuesto', JSON.stringify(presupuesto), false); }catch(e){}
+    try{ await window.storage.set('distribucion', JSON.stringify(distribucion), false); }catch(e){}
     toast();
   }, 350);
 }
@@ -470,6 +559,10 @@ async function loadAll(){
     const r = await window.storage.get('presupuesto', false);
     if(r && r.value) presupuesto = JSON.parse(r.value);
   }catch(e){ /* sin datos guardados aún */ }
+  try{
+    const r = await window.storage.get('distribucion', false);
+    if(r && r.value) distribucion = JSON.parse(r.value);
+  }catch(e){ /* sin datos guardados aún */ }
   renderAll();
 }
 
@@ -480,9 +573,10 @@ const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 /* ================= TABS ================= */
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('#tab-colegiatura,#tab-presupuesto').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#tab-colegiatura,#tab-presupuesto,#tab-distribucion').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
   event.currentTarget.classList.add('active');
+  if(tab==='distribucion') renderDistribucion();
 }
 function switchSub(group, name){
   const map = { col:['mensualidades','transferencias'], pre:['transacciones','resumen'] };
@@ -792,6 +886,76 @@ function editLimite(cuenta, value){
   scheduleSave();
 }
 
+/* ================= DISTRIBUCIÓN LOGIC ================= */
+function periodoLabel(p){
+  return p==='Semanal' ? '/ semana' : (p==='Quincenal' ? '/ quincena' : '/ mes');
+}
+
+function renderDistribucion(){
+  document.getElementById('ingresoInput').value = distribucion.ingreso;
+  document.getElementById('periodoInput').value = distribucion.periodo;
+
+  const ingreso = num(distribucion.ingreso);
+  const totalPct = distribucion.categorias.reduce((s,c)=>s+num(c.pct),0);
+
+  const fill = document.getElementById('pctTotalFill');
+  const label = document.getElementById('pctTotalLabel');
+  const okColor = 'linear-gradient(90deg,var(--sage),var(--sage-dark))';
+  const warnColor = 'linear-gradient(90deg,#D48B82,#C1666B)';
+  fill.style.width = Math.min(100,totalPct)+'%';
+  fill.style.background = totalPct===100 ? okColor : warnColor;
+  label.className = 'pct-total-label ' + (totalPct===100 ? 'ok' : 'warn');
+  const diff = 100 - totalPct;
+  label.innerHTML = totalPct===100
+    ? `<span>Total repartido</span><span>100% ✓</span>`
+    : `<span>Total repartido</span><span>${totalPct}% — ${diff>0? 'te falta repartir '+diff+'%' : 'te pasaste '+Math.abs(diff)+'%'}</span>`;
+
+  const maxPct = Math.max(1, ...distribucion.categorias.map(c=>num(c.pct)));
+  document.getElementById('distRows').innerHTML = distribucion.categorias.map(c=>{
+    const monto = ingreso * (num(c.pct)/100);
+    return `<div class="dist-row">
+      <input type="text" value="${escAttr(c.nombre)}" onchange="editDistCategoria('${c.id}','nombre',this.value)">
+      <div class="pct-input-wrap">
+        <input type="number" min="0" max="100" step="1" value="${c.pct}" onchange="editDistCategoria('${c.id}','pct',this.value)">
+        <span class="pct-sign">%</span>
+      </div>
+      <span></span>
+      <div class="dist-amount">${fmt(monto)}</div>
+      <button class="del-btn" onclick="deleteDistCategoria('${c.id}')" title="Eliminar">🗑</button>
+      <div class="dist-bar-wrap"><div class="dist-bar-fill" style="width:${(num(c.pct)/maxPct*100)}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function updateIngreso(v){
+  distribucion.ingreso = Math.max(0, num(v));
+  renderDistribucion();
+  scheduleSave();
+}
+function updatePeriodo(v){
+  distribucion.periodo = v;
+  renderDistribucion();
+  scheduleSave();
+}
+function editDistCategoria(id, field, value){
+  const c = distribucion.categorias.find(x=>x.id===id);
+  if(!c) return;
+  if(field==='pct') value = Math.max(0, Math.min(100, num(value)));
+  c[field]=value;
+  renderDistribucion();
+  scheduleSave();
+}
+function deleteDistCategoria(id){
+  distribucion.categorias = distribucion.categorias.filter(x=>x.id!==id);
+  renderDistribucion();
+  scheduleSave();
+}
+function addDistCategoria(){
+  distribucion.categorias.push({id:newId(), nombre:'Nueva categoría', pct:0});
+  renderDistribucion();
+  scheduleSave();
+}
+
 /* ================= UTIL ================= */
 function escAttr(s){ return String(s).replace(/"/g,'&quot;'); }
 
@@ -799,6 +963,7 @@ function renderAll(){
   renderColegiatura();
   renderPresupuesto();
   renderResumen();
+  renderDistribucion();
 }
 
 loadAll();
