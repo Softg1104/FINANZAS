@@ -329,6 +329,21 @@
       </div>
     </div>
 
+    <div class="beca-box" style="border-color:var(--sage);">
+      <div>
+        <div class="label">Saldo a favor</div>
+        <div class="hint">Se aplica automático como si fuera tu primera transferencia del semestre.</div>
+      </div>
+      <div class="beca-input-wrap">
+        <span style="font-weight:700;color:var(--sage-dark);font-size:16px;">$</span>
+        <input type="number" id="saldoAFavorInput" min="0" step="1" onchange="updateSaldoAFavor(this.value)">
+      </div>
+    </div>
+
+    <div style="text-align:right;margin-bottom:14px;">
+      <button class="btn-secondary" style="border-color:var(--gold);color:var(--gold);" onclick="reiniciarSemestre()">🔄 Reiniciar semestre</button>
+    </div>
+
     <div class="progress-wrap">
       <div class="progress-track"><div class="progress-fill" id="colProgressFill" style="width:0%"></div></div>
       <div class="progress-label"><span id="colProgressText"></span><span id="colProgressPct"></span></div>
@@ -365,7 +380,7 @@
           <button class="btn-secondary" onclick="toggleForm('formMensualidad')">Cancelar</button>
         </div>
       </div>
-      <div class="note">Nota: la beca solo se descuenta en los renglones marcados con "Aplica beca". Los pagos se van cubriendo en orden con el total transferido a la universidad.</div>
+      <div class="note">Nota: la beca solo se descuenta en los renglones marcados con "Aplica beca". Los pagos se van cubriendo en orden, primero con tu saldo a favor (si tienes) y luego con tus transferencias.</div>
     </div>
 
     <div id="col-transferencias" class="panel">
@@ -495,6 +510,7 @@ const CATEGORIAS = {
 /* ================= ESTADO ================= */
 let colegiatura = {
   beca: 0,
+  saldoAFavor: 0,
   mensualidades: [
     {id:'m1', nombre:'Inscripción', fecha:'2026-07-15', monto:27715, aplicaBeca:false},
     {id:'m2', nombre:'Seguro Orfandad', fecha:'2026-07-15', monto:2140, aplicaBeca:false},
@@ -595,7 +611,9 @@ function toggleForm(id){
 /* ================= COLEGIATURA LOGIC ================= */
 function computeMensualidades(){
   const fraction = (Number(colegiatura.beca)||0)/100;
-  const totalTransferido = colegiatura.transferencias.reduce((s,t)=>s+num(t.monto),0);
+  const saldoAFavor = num(colegiatura.saldoAFavor);
+  const totalTransferidoNuevo = colegiatura.transferencias.reduce((s,t)=>s+num(t.monto),0);
+  const totalTransferido = saldoAFavor + totalTransferidoNuevo; // el saldo a favor se aplica primero, como si fuera la primera transferencia
   let acumulado = 0;
   const rows = colegiatura.mensualidades.map(m=>{
     const montoConBeca = m.aplicaBeca ? num(m.monto)*(1-fraction) : num(m.monto);
@@ -606,12 +624,19 @@ function computeMensualidades(){
     let estado = saldo<=0.005 ? 'Pagada' : (pagado>0 ? 'Parcial' : 'Pendiente');
     return {...m, montoConBeca, acumulado, pagado, saldo, estado};
   });
-  return {rows, totalTransferido};
+  const totalConBeca = rows.reduce((s,r)=>s+r.montoConBeca,0);
+  const totalPagado = rows.reduce((s,r)=>s+r.pagado,0);
+  // cuánto de ese saldo a favor ya se "gastó" cubriendo mensualidades de este semestre
+  const saldoAFavorUsado = Math.min(saldoAFavor, totalPagado);
+  const saldoAFavorRestante = Math.max(0, saldoAFavor - saldoAFavorUsado);
+  const excedenteActual = Math.max(0, totalTransferido - totalConBeca); // lo que sobraría si reinicias hoy
+  return {rows, totalTransferido, totalTransferidoNuevo, saldoAFavor, saldoAFavorUsado, saldoAFavorRestante, totalConBeca, totalPagado, excedenteActual};
 }
 
 function renderColegiatura(){
   document.getElementById('becaInput').value = colegiatura.beca;
-  const {rows, totalTransferido} = computeMensualidades();
+  document.getElementById('saldoAFavorInput').value = colegiatura.saldoAFavor;
+  const {rows, totalTransferido, saldoAFavor, saldoAFavorRestante, excedenteActual} = computeMensualidades();
 
   const tbody = document.getElementById('mensualidadesBody');
   tbody.innerHTML = rows.map(r=>{
@@ -654,6 +679,14 @@ function renderColegiatura(){
     <div class="card accent"><div class="label">Total con beca</div><div class="value">${fmt(totalConBeca)}</div></div>
     <div class="card"><div class="label">Transferido</div><div class="value">${fmt(totalTransferido)}</div></div>
     <div class="card warn"><div class="label">Saldo pendiente</div><div class="value">${fmt(totalSaldo)}</div></div>
+    ${saldoAFavor>0 ? `<div class="card" style="background:linear-gradient(135deg,var(--sage),var(--sage-dark));border:none;">
+      <div class="label" style="color:#fff;">Saldo a favor restante</div>
+      <div class="value" style="color:#fff;">${fmt(saldoAFavorRestante)}</div>
+    </div>` : ''}
+    ${excedenteActual>0.5 ? `<div class="card" style="background:linear-gradient(135deg,var(--gold),#B08A3A);border:none;">
+      <div class="label" style="color:#fff;">Te sobraría si reinicias hoy</div>
+      <div class="value" style="color:#fff;">${fmt(excedenteActual)}</div>
+    </div>` : ''}
   `;
 
   const pct = totalConBeca>0 ? Math.min(100,(totalPagado/totalConBeca)*100) : 0;
@@ -664,6 +697,24 @@ function renderColegiatura(){
 
 function updateBeca(v){
   colegiatura.beca = Math.max(0, Math.min(100, num(v)));
+  renderColegiatura();
+  scheduleSave();
+}
+function updateSaldoAFavor(v){
+  colegiatura.saldoAFavor = Math.max(0, num(v));
+  renderColegiatura();
+  scheduleSave();
+}
+function reiniciarSemestre(){
+  const {excedenteActual, saldoAFavorRestante} = computeMensualidades();
+  const nuevoSaldo = excedenteActual + 0; // excedenteActual ya considera el saldo a favor previo dentro del pool
+  const mensaje = nuevoSaldo > 0.5
+    ? `Vas a reiniciar el semestre. Se guardará ${fmt(nuevoSaldo)} como saldo a favor para el siguiente semestre, y se borrarán las mensualidades y transferencias actuales. ¿Confirmas?`
+    : `Vas a reiniciar el semestre. No hay excedente que guardar (saldo a favor quedaría en $0). Se borrarán las mensualidades y transferencias actuales. ¿Confirmas?`;
+  if(!confirm(mensaje)) return;
+  colegiatura.saldoAFavor = nuevoSaldo;
+  colegiatura.mensualidades = [];
+  colegiatura.transferencias = [];
   renderColegiatura();
   scheduleSave();
 }
