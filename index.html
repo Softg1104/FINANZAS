@@ -554,10 +554,10 @@ function newId(){ return 'id' + (idCounter++) + '_' + Date.now(); }
 let saveTimer = null;
 function scheduleSave(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async ()=>{
-    try{ await window.storage.set('colegiatura', JSON.stringify(colegiatura), false); }catch(e){}
-    try{ await window.storage.set('presupuesto', JSON.stringify(presupuesto), false); }catch(e){}
-    try{ await window.storage.set('distribucion', JSON.stringify(distribucion), false); }catch(e){}
+  saveTimer = setTimeout(()=>{
+    try{ localStorage.setItem('colegiatura', JSON.stringify(colegiatura)); }catch(e){}
+    try{ localStorage.setItem('presupuesto', JSON.stringify(presupuesto)); }catch(e){}
+    try{ localStorage.setItem('distribucion', JSON.stringify(distribucion)); }catch(e){}
     toast();
   }, 350);
 }
@@ -568,16 +568,16 @@ function toast(){
 }
 async function loadAll(){
   try{
-    const r = await window.storage.get('colegiatura', false);
-    if(r && r.value) colegiatura = JSON.parse(r.value);
+    const v = localStorage.getItem('colegiatura');
+    if(v) colegiatura = JSON.parse(v);
   }catch(e){ /* sin datos guardados aún */ }
   try{
-    const r = await window.storage.get('presupuesto', false);
-    if(r && r.value) presupuesto = JSON.parse(r.value);
+    const v = localStorage.getItem('presupuesto');
+    if(v) presupuesto = JSON.parse(v);
   }catch(e){ /* sin datos guardados aún */ }
   try{
-    const r = await window.storage.get('distribucion', false);
-    if(r && r.value) distribucion = JSON.parse(r.value);
+    const v = localStorage.getItem('distribucion');
+    if(v) distribucion = JSON.parse(v);
   }catch(e){ /* sin datos guardados aún */ }
   renderAll();
 }
