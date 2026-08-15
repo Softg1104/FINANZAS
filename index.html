@@ -252,6 +252,22 @@
     .beca-box{flex-direction:column; align-items:flex-start;}
   }
 
+  /* ---- Backup bar ---- */
+  .backup-bar{
+    display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .backup-btn{
+    display:flex; align-items:center; gap:6px;
+    background:var(--white); border:1px solid var(--line); color:var(--plum-soft);
+    border-radius:20px; padding:8px 16px; font-family:'Poppins',sans-serif; font-weight:600;
+    font-size:12.5px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .backup-btn:hover{border-color:var(--sage-dark); color:var(--sage-dark);}
+  .backup-hint{
+    width:100%; text-align:center; font-size:11px; color:var(--plum-soft); opacity:.75; margin-top:-4px;
+  }
+
   /* ---- Distribución ---- */
   .ingreso-box{
     background:var(--white); border:1px solid var(--gold); border-radius:14px;
@@ -307,6 +323,13 @@
     <div class="eyebrow">Panel personal</div>
     <h1>🪷 Mis Finanzas 🪷</h1>
     <div class="vine"></div>
+  </div>
+
+  <div class="backup-bar">
+    <button class="backup-btn" onclick="exportBackup()">📥 Descargar respaldo</button>
+    <button class="backup-btn" onclick="document.getElementById('importFile').click()">📤 Restaurar respaldo</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importBackup(this.files[0])">
+    <div class="backup-hint">Guarda tu respaldo cada tanto — Safari a veces borra los datos si pasas días sin abrir la app.</div>
   </div>
 
   <div class="tabs">
@@ -446,9 +469,11 @@
       <div class="section-title">🪷 Totales generales</div>
       <div class="cards" id="resumenCards"></div>
 
-      <div class="section-title">💳 Límites de tarjetas de crédito</div>
-      <div id="ccCards"></div>
-      <div class="note">✏️ Edita el "Límite" de cada tarjeta — lo demás se calcula solo con tus gastos y pagos registrados.</div>
+      <div class="section-title">💎 Disponible por cuenta</div>
+      <div id="disponibleCards"></div>
+      <div class="cards" id="disponibleTotales" style="margin-top:4px;"></div>
+      <div id="disponibleAccion" style="margin-bottom:6px;"></div>
+      <div class="note">✏️ En Débito/Efectivo edita el "Saldo inicial" (lo que ya tenías antes de usar la app). En AMEX/Plata edita el "Límite". Todo lo demás se calcula solo con tus movimientos registrados. Cuando liquides tus tarjetas, usa el botón de arriba para mandar tu disponible líquido directo a Distribución.</div>
 
       <div class="section-title">🍃 Gasto por categoría</div>
       <div class="table-scroll" style="padding:6px 14px;">
@@ -471,7 +496,7 @@
     <div class="ingreso-box">
       <div>
         <div class="label">Ingreso a repartir</div>
-        <div class="hint">Cambia el monto y el periodo — los montos de cada categoría se recalculan solos.</div>
+        <div class="hint">Así se reparte cada vez que registres un ingreso recibido.</div>
       </div>
       <div class="ingreso-input-wrap">
         <span style="font-weight:700;color:var(--gold);font-size:16px;">$</span>
@@ -491,11 +516,37 @@
 
     <button class="add-btn" onclick="addDistCategoria()">＋ Agregar categoría</button>
     <div class="note">💡 Ponle 0% a lo que ahorita no puedas (como Inversión mientras pagas tarjetas) y súbeselo a Pago de deudas — cuando termines, muévele el porcentaje de regreso. El total debería sumar 100% para repartir todo tu ingreso.</div>
+
+    <div style="text-align:right;margin:18px 0 6px;">
+      <button class="btn-primary" onclick="registrarIngreso()">💰 Registrar ingreso recibido</button>
+    </div>
+
+    <div class="section-title">📊 Disponible por categoría</div>
+    <div id="distSaldos"></div>
+    <div class="note">Esto es lo que llevas acumulado (de todo lo que has registrado como recibido) menos lo que ya has gastado en cada bucket.</div>
+
+    <div class="section-title">🔗 A dónde se descuenta cada categoría de gasto</div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Categoría de gasto</th><th>Se descuenta de</th></tr></thead>
+        <tbody id="mapaCategoriaBody"></tbody>
+      </table>
+    </div>
+    <div class="note">Cuando registres un gasto de esa categoría en Presupuesto, se resta solo de aquí — no tienes que anotarlo aparte.</div>
+
+    <div class="section-title">🗓️ Historial de ingresos registrados</div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Fecha</th><th>Ingreso</th><th>Periodo</th><th>Reparto</th><th></th></tr></thead>
+        <tbody id="aportacionesBody"></tbody>
+      </table>
+    </div>
   </section>
 
 </div>
 
 <div class="save-toast" id="saveToast">Guardado ✓</div>
+
 
 <script>
 /* ================= CONSTANTES ================= */
@@ -528,6 +579,14 @@ let colegiatura = {
 
 let presupuesto = {
   limites: {'💚 AMEX':6000, '🤎 Plata':6000},
+  saldosIniciales: {'💳 Débito':0, '💵 Efectivo':0},
+  mapaCategoria: {
+    '☕ Café':'d3', '🍵 Matcha':'d3', '🍽️ Comida':'d3', '🍔 Restaurantes':'d3', '🍫 Snacks':'d3',
+    '👗 Ropa':'d3', '👠 Zapatos':'d3', '💄 Maquillaje':'d3', '🧴 Cuidado personal':'d3', '💇‍♀️ Cabello / Belleza':'d3',
+    '🚗 Carro / Gasolina':'d2', '🚕 Transporte (Uber/Taxi)':'d3', '🎬 Entretenimiento':'d5', '📱 Suscripciones':'d2',
+    '💊 Salud':'d3', '🏠 Hogar':'d2', '🐾 Mascotas':'d3', '🎁 Regalos':'d3', '✈️ Viajes':'d5',
+    '📚 Educación':'d2', '🔌 Tecnología':'d3', '🍂 Otros gastos random':'d3'
+  },
   transacciones: [
     {id:'x1', fecha:'2026-08-07', tipo:'Gasto', categoria:'🍂 Otros gastos random', cuentaOrigen:'🤎 Plata', cuentaDestino:'', descripcion:'A pagar', monto:5619.74, comision:0},
     {id:'x2', fecha:'2026-08-07', tipo:'Gasto', categoria:'🍂 Otros gastos random', cuentaOrigen:'💚 AMEX', cuentaDestino:'', descripcion:'A pagar', monto:8031.26, comision:0},
@@ -544,7 +603,8 @@ let distribucion = {
     {id:'d3', nombre:'🌷 Gastos personales', pct:20},
     {id:'d4', nombre:'🏦 Inversión / Ahorro', pct:0},
     {id:'d5', nombre:'🎉 Diversión', pct:15},
-  ]
+  ],
+  aportaciones: []
 };
 
 let idCounter = 100;
@@ -579,7 +639,61 @@ async function loadAll(){
     const v = localStorage.getItem('distribucion');
     if(v) distribucion = JSON.parse(v);
   }catch(e){ /* sin datos guardados aún */ }
+  // migración: rellena campos nuevos si vienes de una versión anterior
+  if(!presupuesto.saldosIniciales) presupuesto.saldosIniciales = {'💳 Débito':0, '💵 Efectivo':0};
+  if(!presupuesto.mapaCategoria) presupuesto.mapaCategoria = {};
+  if(!distribucion.aportaciones) distribucion.aportaciones = [];
   renderAll();
+}
+
+/* ---- Respaldo (exportar / importar) ---- */
+function exportBackup(){
+  const data = {
+    _app: 'Mis Finanzas 🪷',
+    _exportadoEl: new Date().toISOString(),
+    colegiatura, presupuesto, distribucion
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fecha = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `mis-finanzas-respaldo-${fecha}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast();
+}
+function importBackup(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let data;
+    try{
+      data = JSON.parse(e.target.result);
+    }catch(err){
+      alert('Ese archivo no se pudo leer. Asegúrate de subir el .json que descargaste antes.');
+      return;
+    }
+    if(!data.colegiatura || !data.presupuesto || !data.distribucion){
+      alert('Ese archivo no tiene el formato esperado de un respaldo de Mis Finanzas.');
+      return;
+    }
+    const fechaExport = data._exportadoEl ? new Date(data._exportadoEl).toLocaleString('es-MX') : 'fecha desconocida';
+    if(!confirm(`Vas a reemplazar TODOS tus datos actuales con este respaldo (exportado: ${fechaExport}). Esto no se puede deshacer. ¿Confirmas?`)) return;
+    colegiatura = data.colegiatura;
+    presupuesto = data.presupuesto;
+    distribucion = data.distribucion;
+    if(!presupuesto.saldosIniciales) presupuesto.saldosIniciales = {'💳 Débito':0, '💵 Efectivo':0};
+    if(!presupuesto.mapaCategoria) presupuesto.mapaCategoria = {};
+    if(!distribucion.aportaciones) distribucion.aportaciones = [];
+    renderAll();
+    scheduleSave();
+    document.getElementById('importFile').value = '';
+    alert('¡Listo! Tus datos fueron restaurados. 🪷');
+  };
+  reader.readAsText(file);
 }
 
 /* ================= HELPERS ================= */
@@ -884,28 +998,69 @@ function renderResumen(){
     <div class="card ${balance>=0?'accent':'warn'}"><div class="label">Balance neto</div><div class="value">${fmt(balance)}</div></div>
   `;
 
-  // Tarjetas de crédito
-  document.getElementById('ccCards').innerHTML = TARJETAS.map(cuenta=>{
+  // Disponible por cuenta (unifica débito/efectivo con tarjetas de crédito)
+  const cuentaCalc = CUENTAS.map(cuenta=>{
+    const ingresos = txs.filter(t=>t.tipo==='Ingreso' && t.cuentaOrigen===cuenta).reduce((s,t)=>s+montoNeto(t),0);
     const gastos = txs.filter(t=>t.tipo==='Gasto' && t.cuentaOrigen===cuenta).reduce((s,t)=>s+montoNeto(t),0);
+    const enviadas = txs.filter(t=>t.tipo==='Transferencia' && t.cuentaOrigen===cuenta).reduce((s,t)=>s+montoNeto(t),0);
     const recibidas = txs.filter(t=>t.tipo==='Transferencia' && t.cuentaDestino===cuenta).reduce((s,t)=>s+num(t.monto),0);
-    const usado = gastos - recibidas;
-    const limite = num(presupuesto.limites[cuenta]);
-    const disponible = limite - usado;
-    const pct = limite>0 ? Math.max(0,Math.min(150,(usado/limite)*100)) : 0;
-    const over = usado > limite;
+    const esTarjeta = TARJETAS.includes(cuenta);
+    if(esTarjeta){
+      const limite = num(presupuesto.limites[cuenta]);
+      const usado = gastos - recibidas;
+      const disponible = limite - usado;
+      return {cuenta, esTarjeta, limite, usado, disponible};
+    }
+    const saldoInicial = num(presupuesto.saldosIniciales[cuenta]);
+    const disponible = saldoInicial + ingresos - gastos - enviadas + recibidas;
+    return {cuenta, esTarjeta, saldoInicial, ingresos, gastos, enviadas, recibidas, disponible};
+  });
+
+  document.getElementById('disponibleCards').innerHTML = cuentaCalc.map(c=>{
+    if(c.esTarjeta){
+      const pct = c.limite>0 ? (c.usado/c.limite)*100 : 0;
+      const over = c.usado > c.limite;
+      return `<div class="cc-card">
+        <div class="cc-top">
+          <span class="cc-name">${c.cuenta}</span>
+          <span class="cc-limit-edit">Límite $ <input type="number" value="${c.limite}" onchange="editLimite('${escAttr(c.cuenta)}',this.value)"></span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,Math.max(0,pct))}%; background:${over?'linear-gradient(90deg,#D48B82,#C1666B)':'linear-gradient(90deg,var(--sage),var(--blush))'}"></div></div>
+        <div class="cc-stats">
+          <span>Usado: ${fmt(c.usado)}</span>
+          <span style="font-weight:700;color:${c.disponible<0?'var(--danger)':'var(--sage-dark)'};">Disponible: ${fmt(c.disponible)}</span>
+          <span>${pct.toFixed(1)}%</span>
+        </div>
+      </div>`;
+    }
     return `<div class="cc-card">
       <div class="cc-top">
-        <span class="cc-name">${cuenta}</span>
-        <span class="cc-limit-edit">Límite $ <input type="number" value="${limite}" onchange="editLimite('${escAttr(cuenta)}',this.value)"></span>
+        <span class="cc-name">${c.cuenta}</span>
+        <span class="cc-limit-edit">Saldo inicial $ <input type="number" value="${c.saldoInicial}" onchange="editSaldoInicial('${escAttr(c.cuenta)}',this.value)"></span>
       </div>
-      <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,pct)}%; background:${over?'linear-gradient(90deg,#D48B82,#C1666B)':'linear-gradient(90deg,var(--sage),var(--blush))'}"></div></div>
-      <div class="cc-stats">
-        <span>Usado: ${fmt(usado)}</span>
-        <span>Disponible: ${fmt(disponible)}</span>
-        <span>${pct.toFixed(1)}%</span>
+      <div class="cc-stats" style="margin-top:2px;">
+        <span>Ingresos: ${fmt(c.ingresos)}</span><span>Gastos: ${fmt(c.gastos)}</span>
+      </div>
+      <div class="cc-stats" style="margin-top:4px;">
+        <span>Transf. enviadas: ${fmt(c.enviadas)}</span><span>Transf. recibidas: ${fmt(c.recibidas)}</span>
+      </div>
+      <div style="margin-top:10px;font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:${c.disponible<0?'var(--danger)':'var(--sage-dark)'};">
+        Disponible: ${fmt(c.disponible)}
       </div>
     </div>`;
   }).join('');
+
+  const totalLiquido = cuentaCalc.filter(c=>!c.esTarjeta).reduce((s,c)=>s+c.disponible,0);
+  const totalCredito = cuentaCalc.filter(c=>c.esTarjeta).reduce((s,c)=>s+c.disponible,0);
+
+  document.getElementById('disponibleTotales').innerHTML = `
+    <div class="card accent"><div class="label">💧 Líquido (Débito + Efectivo)</div><div class="value">${fmt(totalLiquido)}</div></div>
+    <div class="card ${totalCredito<0?'warn':''}"><div class="label">💳 Crédito disponible en tarjetas</div><div class="value">${fmt(totalCredito)}</div></div>
+  `;
+
+  document.getElementById('disponibleAccion').innerHTML = `
+    <button class="btn-primary" onclick="goToDistribucion(${totalLiquido.toFixed(2)})">➡️ Usar ${fmt(totalLiquido)} en Distribución</button>
+  `;
 
   // Categorías (solo gastos)
   const catTotals = CATEGORIAS['Gasto'].map(cat=>{
@@ -935,6 +1090,22 @@ function editLimite(cuenta, value){
   presupuesto.limites[cuenta] = num(value);
   renderResumen();
   scheduleSave();
+}
+function editSaldoInicial(cuenta, value){
+  presupuesto.saldosIniciales[cuenta] = num(value);
+  renderResumen();
+  scheduleSave();
+}
+function goToDistribucion(monto){
+  distribucion.ingreso = num(monto);
+  renderDistribucion();
+  scheduleSave();
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#tab-colegiatura,#tab-presupuesto,#tab-distribucion').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-distribucion').classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  btns[2].classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 /* ================= DISTRIBUCIÓN LOGIC ================= */
@@ -976,6 +1147,98 @@ function renderDistribucion(){
       <div class="dist-bar-wrap"><div class="dist-bar-fill" style="width:${(num(c.pct)/maxPct*100)}%"></div></div>
     </div>`;
   }).join('');
+
+  renderDistSaldos();
+  renderMapaCategoria();
+  renderAportaciones();
+}
+
+/* ---- Disponible acumulado por bucket ---- */
+function computeDistribucionSaldos(){
+  const result = {};
+  distribucion.categorias.forEach(c=>{ result[c.id] = {aportado:0, gastado:0}; });
+  (distribucion.aportaciones||[]).forEach(ap=>{
+    Object.entries(ap.reparto||{}).forEach(([catId,monto])=>{
+      if(result[catId]) result[catId].aportado += num(monto);
+    });
+  });
+  presupuesto.transacciones.filter(t=>t.tipo==='Gasto').forEach(g=>{
+    const catId = presupuesto.mapaCategoria[g.categoria];
+    if(catId && result[catId]) result[catId].gastado += montoNeto(g);
+  });
+  return result;
+}
+
+function renderDistSaldos(){
+  const saldos = computeDistribucionSaldos();
+  document.getElementById('distSaldos').innerHTML = distribucion.categorias.map(c=>{
+    const s = saldos[c.id] || {aportado:0, gastado:0};
+    const disponible = s.aportado - s.gastado;
+    const pctUsado = s.aportado>0 ? Math.min(100,(s.gastado/s.aportado)*100) : 0;
+    const over = disponible < 0;
+    return `<div class="cc-card">
+      <div class="cc-top">
+        <span class="cc-name">${escHtml(c.nombre)}</span>
+        <span style="font-family:'Fraunces',serif;font-weight:700;font-size:16px;color:${over?'var(--danger)':'var(--sage-dark)'};">${fmt(disponible)}</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pctUsado}%; background:${over?'linear-gradient(90deg,#D48B82,#C1666B)':'linear-gradient(90deg,var(--sage),var(--blush))'}"></div></div>
+      <div class="cc-stats">
+        <span>Aportado: ${fmt(s.aportado)}</span>
+        <span>Gastado: ${fmt(s.gastado)}</span>
+        <span>${pctUsado.toFixed(0)}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---- Mapeo categoría de gasto → bucket ---- */
+function renderMapaCategoria(){
+  const bucketOptions = c => distribucion.categorias.map(b=>`<option value="${b.id}" ${b.id===c?'selected':''}>${escHtml(b.nombre)}</option>`).join('');
+  document.getElementById('mapaCategoriaBody').innerHTML = CATEGORIAS['Gasto'].map((cat,idx)=>{
+    const current = presupuesto.mapaCategoria[cat] || '';
+    return `<tr>
+      <td>${cat}</td>
+      <td><select onchange="editMapaCategoriaByIndex(${idx},this.value)">
+        <option value="">— Sin asignar —</option>
+        ${bucketOptions(current)}
+      </select></td>
+    </tr>`;
+  }).join('');
+}
+function editMapaCategoriaByIndex(idx, bucketId){
+  const cat = CATEGORIAS['Gasto'][idx];
+  presupuesto.mapaCategoria[cat] = bucketId || '';
+  renderDistSaldos();
+  scheduleSave();
+}
+
+/* ---- Historial de ingresos recibidos ---- */
+function renderAportaciones(){
+  const list = distribucion.aportaciones||[];
+  document.getElementById('aportacionesBody').innerHTML = list.length ? list.slice().reverse().map(ap=>{
+    const detalle = distribucion.categorias.map(c=>`${escHtml(c.nombre)}: ${fmt(ap.reparto[c.id]||0)}`).join(' · ');
+    return `<tr>
+      <td>${ap.fecha||''}</td>
+      <td>${fmt(ap.ingreso)}</td>
+      <td>${ap.periodo||''}</td>
+      <td style="font-size:11px;">${detalle}</td>
+      <td class="checkbox-cell"><button class="del-btn" onclick="deleteAportacion('${ap.id}')" title="Eliminar">🗑</button></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--plum-soft);padding:16px;">Aún no registras ningún ingreso. Usa el botón "💰 Registrar ingreso recibido" cuando te llegue tu dinero.</td></tr>`;
+}
+function registrarIngreso(){
+  const ingreso = num(distribucion.ingreso);
+  if(ingreso<=0){ alert('Primero pon el monto que recibiste en "Ingreso a repartir".'); return; }
+  const reparto = {};
+  distribucion.categorias.forEach(c=>{ reparto[c.id] = ingreso * (num(c.pct)/100); });
+  distribucion.aportaciones.push({id:newId(), fecha:new Date().toISOString().slice(0,10), ingreso, periodo:distribucion.periodo, reparto});
+  renderDistribucion();
+  scheduleSave();
+}
+function deleteAportacion(id){
+  distribucion.aportaciones = distribucion.aportaciones.filter(a=>a.id!==id);
+  renderDistribucion();
+  scheduleSave();
 }
 
 function updateIngreso(v){
@@ -1009,6 +1272,7 @@ function addDistCategoria(){
 
 /* ================= UTIL ================= */
 function escAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderAll(){
   renderColegiatura();
