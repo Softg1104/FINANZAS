@@ -554,7 +554,7 @@ const CUENTAS = ['💳 Débito','💚 AMEX','🤎 Plata','💵 Efectivo'];
 const TARJETAS = ['💚 AMEX','🤎 Plata'];
 const CATEGORIAS = {
   'Ingreso': ['💰 Salario','🪙 Mesada','🎉 Bonus','💻 Freelance / Extra','🎁 Regalo recibido','↩️ Reembolso','🌿 Otro ingreso'],
-  'Gasto': ['☕ Café','🍵 Matcha','🍽️ Comida','🍔 Restaurantes','🍫 Snacks','👗 Ropa','👠 Zapatos','💄 Maquillaje','🧴 Cuidado personal','💇‍♀️ Cabello / Belleza','🚗 Carro / Gasolina','🚕 Transporte (Uber/Taxi)','🎬 Entretenimiento','📱 Suscripciones','💊 Salud','🏠 Hogar','🐾 Mascotas','🎁 Regalos','✈️ Viajes','📚 Educación','🔌 Tecnología','🍂 Otros gastos random'],
+  'Gasto': ['☕ Café','🍵 Matcha','🍽️ Comida','🍔 Restaurantes','🍫 Snacks','🛒 Súper / Despensa','👗 Ropa','👠 Zapatos','💄 Maquillaje','🧴 Cuidado personal','💇‍♀️ Cabello / Belleza','💅 Uñas / Spa','🚗 Carro / Gasolina','🚕 Transporte (Uber/Taxi)','🅿️ Estacionamiento','🎬 Entretenimiento','🍿 Cine','🍸 Bar','🪩 Antro','🎉 Fiesta / Evento','🎟️ Conciertos / Shows','🎮 Videojuegos','📖 Libros','📱 Suscripciones','💊 Salud','🏠 Hogar','🐾 Mascotas','🎁 Regalos','✈️ Viajes','📚 Educación','🔌 Tecnología','🍂 Otros gastos random'],
   'Transferencia': ['🔄 Transferencia entre cuentas','💳 Pago de tarjeta de crédito','🏦 Comisión bancaria']
 };
 
@@ -581,9 +581,11 @@ let presupuesto = {
   limites: {'💚 AMEX':6000, '🤎 Plata':6000},
   saldosIniciales: {'💳 Débito':0, '💵 Efectivo':0},
   mapaCategoria: {
-    '☕ Café':'d3', '🍵 Matcha':'d3', '🍽️ Comida':'d3', '🍔 Restaurantes':'d3', '🍫 Snacks':'d3',
-    '👗 Ropa':'d3', '👠 Zapatos':'d3', '💄 Maquillaje':'d3', '🧴 Cuidado personal':'d3', '💇‍♀️ Cabello / Belleza':'d3',
-    '🚗 Carro / Gasolina':'d2', '🚕 Transporte (Uber/Taxi)':'d3', '🎬 Entretenimiento':'d5', '📱 Suscripciones':'d2',
+    '☕ Café':'d3', '🍵 Matcha':'d3', '🍽️ Comida':'d3', '🍔 Restaurantes':'d3', '🍫 Snacks':'d3', '🛒 Súper / Despensa':'d2',
+    '👗 Ropa':'d3', '👠 Zapatos':'d3', '💄 Maquillaje':'d3', '🧴 Cuidado personal':'d3', '💇‍♀️ Cabello / Belleza':'d3', '💅 Uñas / Spa':'d3',
+    '🚗 Carro / Gasolina':'d2', '🚕 Transporte (Uber/Taxi)':'d3', '🅿️ Estacionamiento':'d2',
+    '🎬 Entretenimiento':'d5', '🍿 Cine':'d5', '🍸 Bar':'d5', '🪩 Antro':'d5', '🎉 Fiesta / Evento':'d5', '🎟️ Conciertos / Shows':'d5', '🎮 Videojuegos':'d5',
+    '📖 Libros':'d3', '📱 Suscripciones':'d2',
     '💊 Salud':'d3', '🏠 Hogar':'d2', '🐾 Mascotas':'d3', '🎁 Regalos':'d3', '✈️ Viajes':'d5',
     '📚 Educación':'d2', '🔌 Tecnología':'d3', '🍂 Otros gastos random':'d3'
   },
@@ -591,6 +593,20 @@ let presupuesto = {
     {id:'x1', fecha:'2026-08-07', tipo:'Gasto', categoria:'🍂 Otros gastos random', cuentaOrigen:'🤎 Plata', cuentaDestino:'', descripcion:'A pagar', monto:5619.74, comision:0},
     {id:'x2', fecha:'2026-08-07', tipo:'Gasto', categoria:'🍂 Otros gastos random', cuentaOrigen:'💚 AMEX', cuentaDestino:'', descripcion:'A pagar', monto:8031.26, comision:0},
     {id:'x3', fecha:'2026-08-07', tipo:'Ingreso', categoria:'🌿 Otro ingreso', cuentaOrigen:'💳 Débito', cuentaDestino:'', descripcion:'Saldo actual', monto:0, comision:0},
+    {id:'id100_1786754824813', fecha:'2026-08-09', tipo:'Gasto', categoria:'🍽️ Comida', cuentaOrigen:'🤎 Plata', cuentaDestino:'', descripcion:'Uber Eats', monto:226.85, comision:0},
+    {id:'id101_1786754848393', fecha:'2026-08-11', tipo:'Gasto', categoria:'☕ Café', cuentaOrigen:'🤎 Plata', cuentaDestino:'', descripcion:'Starbucks', monto:100, comision:0},
+    {id:'id102_1786754881620', fecha:'2026-08-11', tipo:'Gasto', categoria:'🍫 Snacks', cuentaOrigen:'💚 AMEX', cuentaDestino:'', descripcion:'Papas', monto:55, comision:0},
+    {id:'id103_1786754933426', fecha:'2026-08-14', tipo:'Ingreso', categoria:'🌿 Otro ingreso', cuentaOrigen:'💳 Débito', cuentaDestino:'', descripcion:'Inv', monto:603.03, comision:0},
+    {id:'id104_1786754952689', fecha:'2026-08-14', tipo:'Transferencia', categoria:'💳 Pago de tarjeta de crédito', cuentaOrigen:'💳 Débito', cuentaDestino:'💚 AMEX', descripcion:'Pago Tarjeta', monto:303.03, comision:0},
+    {id:'id105_1786754968694', fecha:'2026-08-14', tipo:'Transferencia', categoria:'💳 Pago de tarjeta de crédito', cuentaOrigen:'💳 Débito', cuentaDestino:'🤎 Plata', descripcion:'Pago Tarjeta', monto:300, comision:0},
+    {id:'id106_1786754989198', fecha:'2026-08-14', tipo:'Gasto', categoria:'☕ Café', cuentaOrigen:'🤎 Plata', cuentaDestino:'', descripcion:'Starbucks', monto:150, comision:0},
+    {id:'id107_1786755006031', fecha:'2026-08-14', tipo:'Ingreso', categoria:'🪙 Mesada', cuentaOrigen:'💳 Débito', cuentaDestino:'', descripcion:'Mamá ', monto:1000, comision:0},
+    {id:'id108_1786755039812', fecha:'2026-08-14', tipo:'Transferencia', categoria:'💳 Pago de tarjeta de crédito', cuentaOrigen:'💳 Débito', cuentaDestino:'💚 AMEX', descripcion:'Pago Tarjeta', monto:500, comision:0},
+    {id:'id109_1786755057908', fecha:'2026-08-14', tipo:'Transferencia', categoria:'💳 Pago de tarjeta de crédito', cuentaOrigen:'💳 Débito', cuentaDestino:'🤎 Plata', descripcion:'Pago Tarjeta', monto:500, comision:0},
+    {id:'id110_1786755094045', fecha:'2026-08-12', tipo:'Gasto', categoria:'🍔 Restaurantes', cuentaOrigen:'💚 AMEX', cuentaDestino:'', descripcion:'Kaliman', monto:293.7, comision:0},
+    {id:'id111_1786755119626', fecha:'2026-08-14', tipo:'Gasto', categoria:'🍫 Snacks', cuentaOrigen:'🤎 Plata', cuentaDestino:'', descripcion:'Cafetería UP', monto:52, comision:0},
+    {id:'id112_1786755154595', fecha:'2026-08-14', tipo:'Gasto', categoria:'🍽️ Comida', cuentaOrigen:'🤎 Plata', cuentaDestino:'', descripcion:'Mercat', monto:52, comision:0},
+    {id:'id113_1786755198150', fecha:'2026-08-12', tipo:'Gasto', categoria:'📱 Suscripciones', cuentaOrigen:'💚 AMEX', cuentaDestino:'', descripcion:'AppleBill ', monto:289, comision:0},
   ]
 };
 
