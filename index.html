@@ -466,8 +466,12 @@
     </div>
 
     <div id="pre-resumen" class="panel">
-      <div class="section-title">🪷 Totales generales</div>
+      <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <span>🪷 Totales generales</span>
+        <button class="btn-secondary" style="border-color:var(--gold);color:var(--gold);font-size:12px;padding:7px 14px;" onclick="reiniciarMes()">🔄 Reiniciar mes</button>
+      </div>
       <div class="cards" id="resumenCards"></div>
+      <div class="note">🔄 <strong>Reiniciar mes</strong> guarda tu disponible actual de cada cuenta (lo que tienes en Débito/Efectivo, lo que debes en AMEX/Plata) como el nuevo punto de partida, guarda tu avance de Distribución, y borra la tabla de movimientos para empezar el mes en blanco. No se pierde nada, solo se "cierra" el mes.</div>
 
       <div class="section-title">💎 Disponible por cuenta</div>
       <div id="disponibleCards"></div>
@@ -580,6 +584,7 @@ let colegiatura = {
 let presupuesto = {
   limites: {'💚 AMEX':6000, '🤎 Plata':6000},
   saldosIniciales: {'💳 Débito':0, '💵 Efectivo':0},
+  usadoInicial: {'💚 AMEX':0, '🤎 Plata':0},
   mapaCategoria: {
     '☕ Café':'d3', '🍵 Matcha':'d3', '🍽️ Comida':'d3', '🍔 Restaurantes':'d3', '🍫 Snacks':'d3', '🛒 Súper / Despensa':'d2',
     '👗 Ropa':'d3', '👠 Zapatos':'d3', '💄 Maquillaje':'d3', '🧴 Cuidado personal':'d3', '💇‍♀️ Cabello / Belleza':'d3', '💅 Uñas / Spa':'d3',
@@ -620,7 +625,8 @@ let distribucion = {
     {id:'d4', nombre:'🏦 Inversión / Ahorro', pct:0},
     {id:'d5', nombre:'🎉 Diversión', pct:15},
   ],
-  aportaciones: []
+  aportaciones: [],
+  gastadoPrevio: {}
 };
 
 let idCounter = 100;
@@ -657,8 +663,10 @@ async function loadAll(){
   }catch(e){ /* sin datos guardados aún */ }
   // migración: rellena campos nuevos si vienes de una versión anterior
   if(!presupuesto.saldosIniciales) presupuesto.saldosIniciales = {'💳 Débito':0, '💵 Efectivo':0};
+  if(!presupuesto.usadoInicial) presupuesto.usadoInicial = {'💚 AMEX':0, '🤎 Plata':0};
   if(!presupuesto.mapaCategoria) presupuesto.mapaCategoria = {};
   if(!distribucion.aportaciones) distribucion.aportaciones = [];
+  if(!distribucion.gastadoPrevio) distribucion.gastadoPrevio = {};
   renderAll();
 }
 
@@ -702,8 +710,10 @@ function importBackup(file){
     presupuesto = data.presupuesto;
     distribucion = data.distribucion;
     if(!presupuesto.saldosIniciales) presupuesto.saldosIniciales = {'💳 Débito':0, '💵 Efectivo':0};
+    if(!presupuesto.usadoInicial) presupuesto.usadoInicial = {'💚 AMEX':0, '🤎 Plata':0};
     if(!presupuesto.mapaCategoria) presupuesto.mapaCategoria = {};
     if(!distribucion.aportaciones) distribucion.aportaciones = [];
+    if(!distribucion.gastadoPrevio) distribucion.gastadoPrevio = {};
     renderAll();
     scheduleSave();
     document.getElementById('importFile').value = '';
@@ -1023,9 +1033,10 @@ function renderResumen(){
     const esTarjeta = TARJETAS.includes(cuenta);
     if(esTarjeta){
       const limite = num(presupuesto.limites[cuenta]);
-      const usado = gastos - recibidas;
+      const usadoInicial = num(presupuesto.usadoInicial[cuenta]);
+      const usado = usadoInicial + gastos - recibidas;
       const disponible = limite - usado;
-      return {cuenta, esTarjeta, limite, usado, disponible};
+      return {cuenta, esTarjeta, limite, usadoInicial, usado, disponible};
     }
     const saldoInicial = num(presupuesto.saldosIniciales[cuenta]);
     const disponible = saldoInicial + ingresos - gastos - enviadas + recibidas;
@@ -1041,6 +1052,7 @@ function renderResumen(){
           <span class="cc-name">${c.cuenta}</span>
           <span class="cc-limit-edit">Límite $ <input type="number" value="${c.limite}" onchange="editLimite('${escAttr(c.cuenta)}',this.value)"></span>
         </div>
+        <div class="cc-limit-edit" style="margin-top:2px;">Ya debías $ <input type="number" value="${c.usadoInicial}" onchange="editUsadoInicial('${escAttr(c.cuenta)}',this.value)"></div>
         <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,Math.max(0,pct))}%; background:${over?'linear-gradient(90deg,#D48B82,#C1666B)':'linear-gradient(90deg,var(--sage),var(--blush))'}"></div></div>
         <div class="cc-stats">
           <span>Usado: ${fmt(c.usado)}</span>
@@ -1112,6 +1124,41 @@ function editSaldoInicial(cuenta, value){
   renderResumen();
   scheduleSave();
 }
+function editUsadoInicial(cuenta, value){
+  presupuesto.usadoInicial[cuenta] = num(value);
+  renderResumen();
+  scheduleSave();
+}
+function reiniciarMes(){
+  const txs = presupuesto.transacciones;
+  const saldos = computeDistribucionSaldos();
+  const resumen = CUENTAS.map(cuenta=>{
+    const ingresos = txs.filter(t=>t.tipo==='Ingreso' && t.cuentaOrigen===cuenta).reduce((s,t)=>s+montoNeto(t),0);
+    const gastos = txs.filter(t=>t.tipo==='Gasto' && t.cuentaOrigen===cuenta).reduce((s,t)=>s+montoNeto(t),0);
+    const enviadas = txs.filter(t=>t.tipo==='Transferencia' && t.cuentaOrigen===cuenta).reduce((s,t)=>s+montoNeto(t),0);
+    const recibidas = txs.filter(t=>t.tipo==='Transferencia' && t.cuentaDestino===cuenta).reduce((s,t)=>s+num(t.monto),0);
+    if(TARJETAS.includes(cuenta)){
+      const usado = num(presupuesto.usadoInicial[cuenta]) + gastos - recibidas;
+      return {cuenta, esTarjeta:true, nuevo: usado};
+    }
+    const disponible = num(presupuesto.saldosIniciales[cuenta]) + ingresos - gastos - enviadas + recibidas;
+    return {cuenta, esTarjeta:false, nuevo: disponible};
+  });
+  const detalle = resumen.map(r=> `${r.cuenta}: ${fmt(r.nuevo)}${r.esTarjeta?' (deuda)':' (saldo inicial)'}`).join('\n');
+  if(!confirm(`Vas a reiniciar el mes. Esto va a quedar así:\n\n${detalle}\n\nSe borrarán todos los movimientos registrados (tu avance de Distribución NO se pierde). ¿Confirmas?`)) return;
+  resumen.forEach(r=>{
+    if(r.esTarjeta) presupuesto.usadoInicial[r.cuenta] = r.nuevo;
+    else presupuesto.saldosIniciales[r.cuenta] = r.nuevo;
+  });
+  if(!distribucion.gastadoPrevio) distribucion.gastadoPrevio = {};
+  distribucion.categorias.forEach(c=>{
+    distribucion.gastadoPrevio[c.id] = (saldos[c.id]||{gastado:0}).gastado;
+  });
+  presupuesto.transacciones = [];
+  renderAll();
+  scheduleSave();
+  alert('¡Mes reiniciado! Tus saldos y tu avance de Distribución quedaron guardados como el nuevo punto de partida. 🪷');
+}
 function goToDistribucion(monto){
   distribucion.ingreso = num(monto);
   renderDistribucion();
@@ -1172,7 +1219,7 @@ function renderDistribucion(){
 /* ---- Disponible acumulado por bucket ---- */
 function computeDistribucionSaldos(){
   const result = {};
-  distribucion.categorias.forEach(c=>{ result[c.id] = {aportado:0, gastado:0}; });
+  distribucion.categorias.forEach(c=>{ result[c.id] = {aportado:0, gastado: num((distribucion.gastadoPrevio||{})[c.id]||0)}; });
   (distribucion.aportaciones||[]).forEach(ap=>{
     Object.entries(ap.reparto||{}).forEach(([catId,monto])=>{
       if(result[catId]) result[catId].aportado += num(monto);
